@@ -183,6 +183,210 @@ GROUP BY weekday
 ORDER BY sessions DESC;
 ```
 
+![image](https://github.com/user-attachments/assets/645b4228-a585-4b68-ae54-56aa94391873)
+
+While Tuesdays see the most website visits, it's interesting to note that Mondays have the highest conversion rate. In contrast, weekends experience a substantial drop in conversions, indicating different visitor behaviors and purchasing patterns between weekdays and weekends.
+
+Website Engagement & Monetization by Device
+
+We can further refine our analysis by examining the data by device type, which will reveal variations in conversion rates and visits across desktops, tablets, and smartphones. This device-specific insight is key for optimizing website design and marketing for each device category.
+
+*Note: in the dataset, revenue is expressed in a scaled format, where the actual value is multiplied by 10^6. For instance, a revenue of $2.40 is recorded as 2,400,000. To interpret these figures accurately, we’ll divide them by 10^6 to get the original dollar amount.*
+
+```
+SELECT
+    deviceCategory,
+    COUNT(DISTINCT unique_session_id) AS sessions,
+    (COUNT(DISTINCT unique_session_id) / SUM(COUNT(DISTINCT unique_session_id)) OVER ()) * 100 AS sessions_percentage,
+    SUM(transactionrevenue) / 1e6 AS revenue,
+    (SUM(transactionrevenue) / SUM(SUM(transactionrevenue)) OVER ()) * 100 AS revenue_percentage
+FROM (
+    SELECT
+        deviceCategory,
+        transactionrevenue,
+        CONCAT(fullvisitorid, '-', visitid) AS unique_session_id
+    FROM gms_project.data_combined
+) t1
+GROUP BY deviceCategory;
+```
+
+![image](https://github.com/user-attachments/assets/f1785299-e6f3-483f-b16d-696bfcc4de3b)
+
+![image](https://github.com/user-attachments/assets/693acdcc-9147-429d-b75d-ffce0b42cb37)
+
+![image](https://github.com/user-attachments/assets/41d6b7b9-582b-4101-b354-db03b6a27d7f)
+
+
+While ~25% of sessions originate from mobile devices, only 5% of revenue is generated through them. This significant discrepancy suggests a need to optimize the mobile shopping experience. Marketing strategies should focus on enhancing mobile usability, streamlining the checkout process, and tailoring mobile-specific promotions. Considering the significant number of users who shop on their mobile devices during commutes or workday breaks, a seamless mobile experience on our e-commerce platform is crucial. To further tap into this growing user base, Google might also consider developing a dedicated mobile app, which could substantially increase revenue from mobile users.
+
+Website Engagement & Monetization by Region
+
+We can analyse these numbers further to determine if there are regional differences affecting mobile device usage and revenue generation. This deeper dive will help us understand whether certain regions have higher mobile engagement or sales, guiding targeted marketing strategies and region-specific optimizations.
+```
+SELECT
+    deviceCategory,
+    region,
+    COUNT(DISTINCT unique_session_id) AS sessions,
+    (COUNT(DISTINCT unique_session_id) / SUM(COUNT(DISTINCT unique_session_id)) OVER ()) * 100 AS sessions_percentage,
+    SUM(transactionrevenue) / 1e6 AS revenue,
+    (SUM(transactionrevenue) / SUM(SUM(transactionrevenue)) OVER ()) * 100 AS revenue_percentage
+FROM (
+    SELECT
+        deviceCategory,
+        CASE 
+            WHEN region = '' OR region IS NULL THEN 'NA'
+            ELSE region 
+        END AS region,
+        transactionrevenue,
+        CONCAT(fullvisitorid, '-', visitid) AS unique_session_id
+    FROM gms_project.data_combined
+    WHERE deviceCategory = 'mobile'
+) t1
+GROUP BY deviceCategory, region
+ORDER BY sessions DESC;
+```
+
+![image](https://github.com/user-attachments/assets/82890db1-40e9-44d9-b19e-33e4d59e7c3f)
+
+The data shows that while only 1% of mobile sessions are from Washington, they contribute to 11% of revenue. Similarly, Illinois sees 3% of sessions but accounts for 9% of revenue. This suggests an untapped opportunity, as these regions have higher conversion rates or transaction values despite fewer sessions. Focusing marketing efforts on these regions could potentially increase revenue, leveraging their higher purchasing effectiveness. Potential approaches could include targeted marketing campaigns, localized promotions, or even exploring the reasons behind the higher conversion rates, such as product preferences or purchasing power.
+One limitation in our analysis arises from the fact that some mobile sessions in the dataset are not mapped to any specific region. This means that for a subset of mobile sessions, the region field is either left blank or marked as NULL, indicating that the geographic location of these users is unknown or not recorded. Addressing this issue with the Data Engineering team could be vital for ensuring more accurate and comprehensive data for future analyses.
+
+Website Retention
+
+Next, we’ll examine website retention, specifically focusing on whether users are new or returning. This will provide insights into user loyalty and the effectiveness of strategies in encouraging repeat visits. Typically, having around 50-70% new users and 30-50% returning users is considered a good balance.
+```
+SELECT
+    CASE 
+        WHEN newVisits = 1 THEN 'New Visitor'
+        ELSE 'Returning Visitor'
+    END AS visitor_type,
+    COUNT(DISTINCT fullVisitorId) AS visitors,
+    (COUNT(DISTINCT fullVisitorId) / SUM(COUNT(DISTINCT fullVisitorId)) OVER ()) * 100 AS visitors_percentage
+FROM gms_project.data_combined
+GROUP BY visitor_type;
+```
+
+![image](https://github.com/user-attachments/assets/5434bc1c-03d3-4d09-9ad1-d095361f83aa)
+
+Interestingly, about 80% of users visit the website only once. This statistic suggests a need for better incentives or value propositions to encourage repeat visits, presenting a major opportunity for enhanced retention strategies such as personalized marketing, loyalty programs, or targeted retargeting campaigns. In contrast, the substantial influx of new visitors reflects successful marketing efforts in brand awareness, effectively attracting people to the site initially. Key factors like a user-friendly interface, engaging content, and smooth navigation play a crucial role here.
+
+Website Acquisition
+
+Building on this analysis, the next logical step is to calculate the bounce rate. This measure is key as it indicates the proportion of visitors who exit the site after viewing only one page and is often used to evaluate the effectiveness of acquisition strategies. A high bounce rate can indicate that the landing page or the initial content isn't meeting the expectations of visitors or isn't engaging enough to encourage further exploration of the site or purchases. Understanding the bounce rate offers valuable insights into the site's initial engagement success with its audience.
+```
+SELECT
+    COUNT(DISTINCT unique_session_id) AS sessions,
+    SUM(bounces) AS bounces,
+    (SUM(bounces) / COUNT(DISTINCT unique_session_id)) * 100 AS bounce_rate
+FROM (
+    SELECT
+        bounces,
+        CONCAT(fullvisitorid, '-', visitid) AS unique_session_id
+    FROM gms_project.data_combined
+) t1;
+```
+
+![image](https://github.com/user-attachments/assets/248a7556-54ec-4863-9559-46e8736238fa)
+
+A bounce rate within the 20-40% range is generally seen as effective engagement. However, to truly understand visitor behavior and optimize engagement strategies, it's important to analyze the bounce rate by individual channels. This deeper analysis will enable us to tailor our strategies to specific audiences, refine our understanding of user interactions, and allocate marketing resources more efficiently.
+
+Website Acquisition by Channel
+
+Moving forward, we'll delve into the bounce rate by channel to gain a clearer picture of the effectiveness of various marketing strategies. This will also shed light on user engagement across diverse traffic sources, providing valuable insights for optimizing our outreach efforts.
+```
+SELECT
+    channelGrouping,
+    COUNT(DISTINCT unique_session_id) AS sessions,
+    SUM(bounces) AS bounces,
+    (SUM(bounces) / COUNT(DISTINCT unique_session_id)) * 100 AS bounce_rate
+FROM (
+    SELECT
+        channelGrouping,
+        bounces,
+        CONCAT(fullvisitorid, '-', visitid) AS unique_session_id
+    FROM gms_project.data_combined
+) t1
+GROUP BY channelGrouping
+ORDER BY sessions DESC;
+```
+
+![image](https://github.com/user-attachments/assets/7ac1cb9e-635b-4419-acc6-01e39f636ec5)
+
+Organic Search, Paid Search, and Display exhibit bounce rates of 30-40%, indicating effective visitor engagement and an ability to encourage exploration beyond the landing page. Referral shows the lowest bounce rate, marking it as particularly healthy. However, Direct, Social, and Affiliates, with bounce rates of 40-50%, highlight areas where there is potential for improvement.
+
+Website Acquisition & Monetization by Channel
+
+Building on our analysis of visits and bounce rates by channel, we'll next include key metrics like time on site, revenue, and conversion rate. This broader evaluation will give us a fuller view of each channel's performance, encompassing not only traffic volume but also user engagement quality, revenue generation efficiency, and overall conversion impact.
+```
+SELECT
+    channelGrouping,
+    COUNT(DISTINCT unique_session_id) AS sessions,
+    SUM(bounces) AS bounces,
+    (SUM(bounces) / COUNT(DISTINCT unique_session_id)) * 100 AS bounce_rate,
+    SUM(pageviews) / COUNT(DISTINCT unique_session_id) AS avg_pagesonsite,
+    SUM(timeonsite) / COUNT(DISTINCT unique_session_id) AS avg_timeonsite,
+    SUM(CASE WHEN transactions >= 1 THEN 1 ELSE 0 END) AS conversions,
+    (SUM(CASE WHEN transactions >= 1 THEN 1 ELSE 0 END) / COUNT(DISTINCT unique_session_id)) * 100 AS conversion_rate,
+    SUM(transactionrevenue) / 1e6 AS revenue
+FROM (
+    SELECT
+        channelGrouping,
+        bounces,
+        pageviews,
+        timeonsite,
+        transactions,
+        transactionrevenue,
+        CONCAT(fullvisitorid, '-', visitid) AS unique_session_
+```
+
+![image](https://github.com/user-attachments/assets/c7bfd391-d158-4c4f-9b07-d59393896ac7)
+
+Referral leads with the lowest bounce rate and highest conversion at 7%, driving strong revenue, making it a prime candidate for expanded partnerships. Organic Search, with the most sessions and a solid 32% bounce rate, shows robust SEO efficacy and good conversion potential. Direct traffic, while high at a 46% bounce rate, has moderate conversions, suggesting a need for more personalized engagement. Social media, despite high traffic, suffers from the lowest conversions, calling for more targeted campaigns. Paid Search and Display, both with 34% bounce rates, demonstrate moderate visitor retention but require improved targeting for better conversions. Lastly, Affiliates, with the highest bounce rate and lowest conversions, need a thorough evaluation of partner quality.
+
+Results
+
+In conclusion, let's recap our recommendations below to summarize the key strategies and insights derived from our analysis.
+Seasonal and Holiday Campaigns: During key periods, such as the December holidays, create themed promotions and exclusive holiday deals. Develop holiday guides, offer limited-time discounts, and run festive-themed marketing campaigns to attract shoppers. Replicating this strategy in other months could potentially lead to a 25% uplift in revenue, akin to what is typically seen in December.
+
+Maximize Monday Conversions: With Mondays having the highest conversion rates but lower traffic, aim to boost Monday traffic by at least 10% to reach Tuesday levels. Launch start-of-the-week promotions and exclusive deals, and actively promote these through targeted email and social media campaigns early in the week.
+
+Targeted Weekday Promotions: Leverage the high traffic on Tuesdays and Wednesdays with special promotions and deals. Tailor your email marketing and social media campaigns to coincide with these peak days, ensuring promotions reach users when they are most active online.
+
+Weekend Engagement Strategies: Use retargeting ads to re-engage weekday visitors with special weekend promotions. Implement loyalty programs offering rewards for weekend shopping to boost off-peak traffic and sales by 15%.
+Enhance Mobile Experience: With 25% of sessions but only 5% of revenue coming from mobile, and considering that many users shop during commutes or workday breaks, focus on improving the mobile shopping experience. This could involve optimizing the mobile site's user interface, offering mobile-specific deals, or enhancing mobile payment options.
+
+Focus on High-Value Regions: Address the disproportionate revenue contribution from Washington and Illinois. Develop targeted marketing strategies for these regions, possibly with localized offers or campaigns, to capitalize on their higher spending patterns.
+
+Strengthen User Engagement and Retention: With 80% one-time visitors, target a 10% increase in repeat visits by enhancing the user experience for first-time visitors through personalized content, retargeting campaigns, and loyalty programs. Focus on engaging direct traffic with personalized strategies to reduce its high bounce rate.
+
+Optimize Referral and Organic Channels: Due to their low bounce rate and high conversion, aim to increase referral traffic by 20% through expanded partnerships. Continue to improve SEO for Organic Search, which shows robust session numbers and a good potential for conversions.
+
+Revamp Social Media and Paid Channels: Redesign social media campaigns for higher engagement and conversion. Improve targeting in Paid Search and Display advertising to reduce the 34% bounce rate and enhance visitor retention.
+
+Reevaluate and Enhance Affiliate Strategies: Thoroughly assess affiliate partnerships, focusing on the quality and relevance to address their high bounce rate and low conversions. Restructure or terminate underperforming affiliations to improve efficiency.
+
+These recommendations aim to capitalize on identified trends and insights, maximizing revenue opportunities throughout the year.
+
+Next Steps
+
+Moving forward, our analysis could delve into several key areas to further enhance our understanding and strategy:
+
+Peak Hours Analysis: We could investigate the specific hours of the day that yield the highest number of website visits and conversions. This would help us optimize our engagement strategies to target peak activity times.
+
+Regional Performance: We could examine regions with a high number of visits but low conversion rates to identify potential barriers to conversion, and then tailor our regional strategies accordingly.
+
+Buyer Behavior Segmentation: We could segment and analyze two distinct customer groups: bulk buyers versus individual purchasers. Understanding their differing motivations and behaviors can inform targeted marketing and sales tactics.
+
+Transaction Value Assessment: We could evaluate the average value of each transaction. A low average order size or value might indicate potential revenue losses, underscoring the need for strategic adjustments.
+
+These focused analyses would provide deeper insights, enabling us to refine our strategies and drive more effective and targeted marketing initiatives.
+
+
+
+
+
+
+
 
 
 
